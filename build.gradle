@@ -1,0 +1,93 @@
+buildscript {
+	ext {
+		springBootVersion = '1.5.2.RELEASE'
+		modelmapperVersion = '1.1.0'
+	}
+	repositories {
+		mavenCentral()
+		jcenter()
+	}
+	dependencies {
+		classpath("org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}")
+		classpath("org.hidetake:gradle-ssh-plugin:2.9.0")
+	}
+}
+
+apply plugin: 'java'
+apply plugin: 'eclipse'
+apply plugin: 'org.springframework.boot'
+apply plugin: 'org.hidetake.ssh'
+
+version = '0.0.1-SNAPSHOT'
+sourceCompatibility = 1.8
+
+project.ext {
+	jarVersion = version + "-" + new Date().format('yyyyMMdd-HHmmss')
+}
+
+jar {
+	baseName = project.name
+	version = project.jarVersion
+	exclude("build/**")
+}
+
+repositories {
+	mavenCentral()
+	maven { url 'https://oss.sonatype.org/content/repositories/snapshots' }
+	maven { url 'http://mvn.neemre.com/' }
+}
+
+dependencies {
+	compile('org.springframework.boot:spring-boot-devtools')
+	compile('org.springframework.boot:spring-boot-starter')
+	compile('org.springframework.boot:spring-boot-starter-data-jpa')
+	compile('org.springframework.boot:spring-boot-starter-security')
+	testCompile('org.springframework.boot:spring-boot-starter-test')
+	compile group: 'org.modelmapper', name: 'modelmapper', version: "${modelmapperVersion}"
+	compile('com.linecorp.bot:line-bot-spring-boot:1.12.0')
+	compile('org.apache.httpcomponents:httpclient:4.5.3')
+	compile('org.jsoup:jsoup:1.10.2')
+	compile('com.squareup.retrofit2:converter-jackson')
+	compile('com.squareup.retrofit2:retrofit')
+	compile('org.springframework.boot:spring-boot-starter-jdbc:1.5.2.RELEASE')
+	compile('org.mariadb.jdbc:mariadb-java-client')
+	compile('eu.verdelhan:ta4j:0.9')
+	compile('joda-time:joda-time:2.3')
+	compile('org.jfree:jfreechart:1.0.17')
+	compile('org.knowm.xchange:xchange-core:4.3.1-SNAPSHOT')
+	compile('org.knowm.xchange:xchange-bittrex:4.3.1-SNAPSHOT')
+	compile('org.knowm.xchange:xchange-bitfinex:4.3.1-SNAPSHOT')
+	compile('org.knowm.xchange:xchange-poloniex:4.3.1-SNAPSHOT')
+	compile group: 'org.reflections', name: 'reflections', version: '0.9.11'
+	compile 'com.squareup.retrofit2:retrofit:2.3.0'
+	compileOnly "org.projectlombok:lombok:1.16.18"
+	compile 'com.neemre.btcd-cli4j:btcd-cli4j-core:0.5.1'
+}
+
+ssh.settings {
+	knownHosts = allowAnyHosts
+}
+
+remotes {
+	serviceServer {
+		host = project.properties["serviceHost"]
+		user = project.properties["serviceUser"]
+		password = project.properties["servicePassword"]
+	}
+}
+
+task remoteDeploy {
+	doLast {
+		ssh.run {
+			session(remotes.serviceServer) {
+				final jarName = jar.baseName + "-" + jar.version + ".jar"
+				println "Service Server Deploy : ${jarName}"
+
+				println "Deploy Start!"
+				execute "rm ${project.properties["servicePath"]}", ignoreError: true
+				put from: "build/libs/${jarName}", into: project.properties["servicePath"]
+				println "Deploy Complete."
+			}
+		}
+	}
+}
